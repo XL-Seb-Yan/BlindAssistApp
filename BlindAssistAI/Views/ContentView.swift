@@ -30,12 +30,23 @@ struct ContentView: View {
       }
       .navigationTitle("BlindAssist AI")
       .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            viewModel.toggleLanguage()
+          } label: {
+            Text(viewModel.language.toggleTitle)
+              .fontWeight(.semibold)
+          }
+          .accessibilityLabel(viewModel.language.toggleAccessibilityLabel)
+        }
+      }
       .sheet(isPresented: $viewModel.showCamera) {
         CameraPicker { image in
           viewModel.handleCapturedImage(image)
         }
       }
-      .alert("提示", isPresented: $viewModel.showAlert) {
+      .alert(viewModel.text.alertTitle, isPresented: $viewModel.showAlert) {
         Button("OK", role: .cancel) {}
       } message: {
         Text(viewModel.alertMessage)
@@ -50,24 +61,24 @@ struct ContentView: View {
         .foregroundColor(.blue)
         .accessibilityHidden(true)
 
-      Text("助盲环境感知助手")
+      Text(viewModel.text.headerTitle)
         .font(.largeTitle)
         .fontWeight(.bold)
         .foregroundColor(.white)
         .multilineTextAlignment(.center)
 
-      Text("拍摄前方环境，并用 AI 模拟分析障碍物与风险。")
+      Text(viewModel.text.headerSubtitle)
         .font(.body)
         .foregroundColor(.white.opacity(0.8))
         .multilineTextAlignment(.center)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("助盲环境感知助手，拍摄前方环境，并用人工智能模拟分析障碍物与风险。")
+    .accessibilityLabel(viewModel.text.headerAccessibilityLabel)
   }
 
   private var cameraPreviewSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("当前拍摄画面")
+      Text(viewModel.text.cameraSectionTitle)
         .font(.headline)
         .foregroundColor(.white.opacity(0.7))
 
@@ -89,19 +100,19 @@ struct ContentView: View {
               .font(.system(size: 42))
               .foregroundColor(.white.opacity(0.7))
 
-            Text("尚未拍摄照片")
+            Text(viewModel.text.noPhotoText)
               .foregroundColor(.white.opacity(0.7))
           }
         }
       }
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel(viewModel.capturedImage == nil ? "尚未拍摄照片" : "已经拍摄一张照片")
+    .accessibilityLabel(viewModel.capturedImage == nil ? viewModel.text.noPhotoText : viewModel.text.photoCapturedAccessibilityLabel)
   }
 
   private var statusCard: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("当前状态")
+      Text(viewModel.text.currentStatusTitle)
         .font(.headline)
         .foregroundColor(.white.opacity(0.7))
 
@@ -111,7 +122,7 @@ struct ContentView: View {
           .frame(width: 18, height: 18)
           .accessibilityHidden(true)
 
-        Text(viewModel.status.rawValue)
+        Text(viewModel.statusText)
           .font(.title2)
           .fontWeight(.bold)
           .foregroundColor(.white)
@@ -123,16 +134,16 @@ struct ContentView: View {
     .background(Color.white.opacity(0.12))
     .cornerRadius(20)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("当前状态，\(viewModel.status.rawValue)")
+    .accessibilityLabel(viewModel.text.statusAccessibilityLabel(statusText: viewModel.statusText))
   }
 
   private var resultCard: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("AI 提示")
+      Text(viewModel.text.aiTipTitle)
         .font(.headline)
         .foregroundColor(.white.opacity(0.7))
 
-      Text(viewModel.latestResult.spokenResponse)
+      Text(viewModel.spokenResponseText)
         .font(.title2)
         .fontWeight(.semibold)
         .foregroundColor(.white)
@@ -142,16 +153,22 @@ struct ContentView: View {
         .background(Color.white.opacity(0.3))
 
       VStack(alignment: .leading, spacing: 8) {
-        infoRow(title: "风险等级", value: viewModel.latestResult.riskLevel.rawValue)
-        infoRow(title: "主要情况", value: viewModel.latestResult.mainObstacle)
-        infoRow(title: "建议方向", value: viewModel.directionText(viewModel.latestResult.direction))
+        infoRow(title: viewModel.text.riskLevelTitle, value: viewModel.riskLevelText)
+        infoRow(title: viewModel.text.mainSituationTitle, value: viewModel.mainObstacleText)
+        infoRow(title: viewModel.text.suggestedDirectionTitle, value: viewModel.directionText(viewModel.latestResult.direction))
       }
     }
     .padding()
     .background(viewModel.resultBackgroundColor)
     .cornerRadius(20)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("AI 提示，\(viewModel.latestResult.spokenResponse)。风险等级，\(viewModel.latestResult.riskLevel.rawValue)。主要情况，\(viewModel.latestResult.mainObstacle)。")
+    .accessibilityLabel(
+      viewModel.text.resultAccessibilityLabel(
+        response: viewModel.spokenResponseText,
+        riskLevel: viewModel.riskLevelText,
+        obstacle: viewModel.mainObstacleText
+      )
+    )
   }
 
   private func infoRow(title: String, value: String) -> some View {
@@ -172,64 +189,64 @@ struct ContentView: View {
   private var actionButtons: some View {
     VStack(spacing: 14) {
       LargeActionButton(
-        title: "拍照分析",
+        title: viewModel.text.scanButtonTitle,
         systemImage: "camera.fill",
         backgroundColor: .green,
         action: {
           viewModel.openCamera()
         },
-        accessibilityText: "打开摄像头，拍摄前方环境并分析"
+        accessibilityText: viewModel.text.scanButtonAccessibility
       )
 
       LargeActionButton(
-        title: "重新拍照",
+        title: viewModel.text.retakeButtonTitle,
         systemImage: "arrow.clockwise.camera.fill",
         backgroundColor: .blue,
         action: {
           viewModel.openCamera()
         },
-        accessibilityText: "重新拍摄前方环境"
+        accessibilityText: viewModel.text.retakeButtonAccessibility
       )
 
       LargeActionButton(
-        title: "暂停识别",
+        title: viewModel.text.pauseButtonTitle,
         systemImage: "pause.fill",
         backgroundColor: .orange,
         action: {
           viewModel.pause()
         },
-        accessibilityText: "暂停识别"
+        accessibilityText: viewModel.text.pauseButtonAccessibility
       )
 
       LargeActionButton(
-        title: "模拟高风险",
+        title: viewModel.text.simulateHighRiskButtonTitle,
         systemImage: "exclamationmark.triangle.fill",
         backgroundColor: .red,
         action: {
           viewModel.simulateHighRisk()
         },
-        accessibilityText: "模拟高风险场景"
+        accessibilityText: viewModel.text.simulateHighRiskButtonAccessibility
       )
 
       LargeActionButton(
-        title: "紧急求助",
+        title: viewModel.text.emergencyHelpButtonTitle,
         systemImage: "phone.fill",
         backgroundColor: .purple,
         action: {
           viewModel.emergencyHelp()
         },
-        accessibilityText: "紧急求助按钮"
+        accessibilityText: viewModel.text.emergencyHelpButtonAccessibility
       )
     }
   }
 
   private var safetyNotice: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text("安全提示")
+      Text(viewModel.text.safetyTitle)
         .font(.headline)
         .foregroundColor(.yellow)
 
-      Text("本 App 目前是学习与演示原型，只能作为环境感知辅助工具，不能替代导盲杖、导盲犬或真人协助。当前版本已加入真实拍照功能，但 AI 分析仍为模拟结果。")
+      Text(viewModel.text.safetyText)
         .font(.footnote)
         .foregroundColor(.white.opacity(0.78))
         .fixedSize(horizontal: false, vertical: true)
@@ -238,7 +255,7 @@ struct ContentView: View {
     .background(Color.yellow.opacity(0.12))
     .cornerRadius(16)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("安全提示，本 App 目前是学习与演示原型，只能作为环境感知辅助工具，不能替代导盲杖、导盲犬或真人协助。当前版本已加入真实拍照功能，但人工智能分析仍为模拟结果。")
+    .accessibilityLabel("\(viewModel.text.safetyTitle), \(viewModel.text.safetyText)")
   }
 }
 
