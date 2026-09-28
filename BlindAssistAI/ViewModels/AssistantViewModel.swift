@@ -207,7 +207,7 @@ struct AppText {
   var languageChanged: String {
     switch language {
     case .traditionalChinese:
-      return "已切換為繁體中文。"
+      return "已經轉為廣東話啦。"
     case .simplifiedChinese:
       return "已切换为简体中文。"
     case .english:
@@ -348,23 +348,23 @@ struct AppText {
 
   var cameraPrompt: String {
     localized(
-      traditional: "請將手機對準前方，然後拍照。",
+      traditional: "麻煩將部電話對住前面，然後影相。",
       simplified: "请将手机对准前方，然后拍照。",
       english: "Point the phone forward, then take a photo."
     )
   }
 
   var analyzingSpeech: String {
-    localized(traditional: "正在分析前方環境。", simplified: "正在分析前方环境。", english: "Analyzing the area ahead.")
+    localized(traditional: "而家分析緊前面嘅環境。", simplified: "正在分析前方环境。", english: "Analyzing the area ahead.")
   }
 
   var pausedSpeech: String {
-    localized(traditional: "已暫停識別。", simplified: "已暂停识别。", english: "Recognition paused.")
+    localized(traditional: "而家停止識別前面個環境。", simplified: "已暂停识别。", english: "Recognition paused.")
   }
 
   var emergencyHelpSpeech: String {
     localized(
-      traditional: "緊急求助功能將在後續版本加入。請先聯絡身邊的人。",
+      traditional: "緊急求助功能會喺之後嘅版本先加入，麻煩先聯絡返身邊嘅人。",
       simplified: "紧急求助功能将在后续版本加入。请先联系身边的人。",
       english: "Emergency help will be added in a later version. Please contact someone nearby first."
     )
