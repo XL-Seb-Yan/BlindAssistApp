@@ -55,17 +55,51 @@ final class AssistantViewModel: ObservableObject {
     analyzeCapturedImage()
   }
 
-  func analyzeCapturedImage() {
-    status = .analyzing
-    speechManager.speak(text.analyzingSpeech, language: language.speechCode)
+    func analyzeCapturedImage() {
+        guard let image = capturedImage else {
+            return
+        }
 
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-      let result = self.analyzer.analyzeImage()
-      self.latestResult = result
-      self.status = .completed
-      self.handleResultFeedback(result)
+        status = .analyzing
+
+        speechManager.speak(
+            text.analyzingSpeech,
+            language: language.speechCode
+        )
+
+        Task { @MainActor in
+            do {
+                let result = try await analyzer.analyzeImage(image)
+
+                latestResult = result
+                status = .completed
+
+                handleResultFeedback(result)
+
+            } catch {
+                latestResult = VisionAnalysisResult(
+                    riskLevel: .unknown,
+                    mainObstacle: LocalizedText(
+                        traditionalChinese: "暫時無法完成分析",
+                        simplifiedChinese: "暂时无法完成分析",
+                        english: "Analysis could not be completed"
+                    ),
+                    direction: "unknown",
+                    spokenResponse: LocalizedText(
+                        traditionalChinese: "暫時分析唔到，停低先，再試多次。",
+                        simplifiedChinese: "暂时无法完成分析，请停下并重新尝试。",
+                        english: "Analysis failed. Please stop and try again."
+                    )
+                )
+
+                status = .completed
+                handleResultFeedback(latestResult)
+            }
+        }
     }
-  }
+
+
+
 
   func simulateHighRisk() {
     let result = analyzer.highRiskScene()
