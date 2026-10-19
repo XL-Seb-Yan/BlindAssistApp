@@ -29,7 +29,10 @@ final class AssistantViewModel: ObservableObject {
 
   private let speechManager = SpeechManager()
   private let hapticManager = HapticManager()
-  private let analyzer = MockVisionAnalyzer()
+  private let analyzer:VisionAnalyzing
+  init(analyzer:VisionAnalyzing = MockVisionAnalyzer()){
+    self.analyzer = analyzer
+  }
 
   func toggleLanguage() {
     language = language.next
@@ -102,7 +105,9 @@ final class AssistantViewModel: ObservableObject {
 
 
   func simulateHighRisk() {
-    let result = analyzer.highRiskScene()
+    let mockAnalyzer = MockVisionAnalyzer()
+    let result = mockAnalyzer.highRiskScene()
+    
     latestResult = result
     status = .completed
     handleResultFeedback(result)
