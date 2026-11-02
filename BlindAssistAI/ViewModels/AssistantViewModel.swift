@@ -30,7 +30,7 @@ final class AssistantViewModel: ObservableObject {
   private let speechManager = SpeechManager()
   private let hapticManager = HapticManager()
   private let analyzer:VisionAnalyzing
-  init(analyzer:VisionAnalyzing = MockVisionAnalyzer()){
+  init(analyzer:VisionAnalyzing = OpenAIVisionAnalyzer()){
     self.analyzer = analyzer
   }
 

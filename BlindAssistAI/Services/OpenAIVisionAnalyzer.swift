@@ -32,7 +32,7 @@ final class OpenAIVisionAnalyzer: VisionAnalyzing {
         // 下一步：
         // 把 imageData POST 到 Backend
 
-        fatalError("Backend connection not implemented yet")
+        throw ImageProcessingError.failed
     }
 }
 
