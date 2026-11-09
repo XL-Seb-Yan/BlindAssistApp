@@ -11,7 +11,7 @@ final class OpenAIVisionAnalyzer: VisionAnalyzing {
 
     // Replace with your Mac's local IP address
     private let backendURL =
-        "http://127.0.0.1:8000/analyze"
+        "https://blindassistapp-ofkq.onrender.com/analyze"
 
     func analyzeImage(
         _ image: UIImage
