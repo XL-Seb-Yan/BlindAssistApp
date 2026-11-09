@@ -39,19 +39,49 @@ final class AssistantViewModel: ObservableObject {
     speechManager.speak(text.languageChanged, language: language.speechCode)
   }
 
-  func openCamera() {
-    status = .ready
+    func openCamera() {
 
-    guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
-      alertMessage = text.cameraUnavailableAlert
-      showAlert = true
-      speechManager.speak(text.cameraUnavailableSpeech, language: language.speechCode)
-      return
+        status = .ready
+
+        // Simulator: use a test image
+        #if targetEnvironment(simulator)
+
+        print("Running in Simulator")
+
+        guard let image = UIImage(named: "TestScene") else {
+            print("TestScene image not found")
+            return
+        }
+
+        print("Test image loaded")
+
+        handleCapturedImage(image)
+        return
+
+        #else
+
+        // Real iPhone: use camera
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            alertMessage = text.cameraUnavailableAlert
+            showAlert = true
+
+            speechManager.speak(
+                text.cameraUnavailableSpeech,
+                language: language.speechCode
+            )
+            return
+        }
+
+        speechManager.speak(
+            text.cameraPrompt,
+            language: language.speechCode
+        )
+
+        showCamera = true
+
+        #endif
     }
 
-    speechManager.speak(text.cameraPrompt, language: language.speechCode)
-    showCamera = true
-  }
 
   func handleCapturedImage(_ image: UIImage) {
     capturedImage = image
