@@ -2,10 +2,20 @@ import Combine
 import Foundation
 import SwiftUI
 import UIKit
-
+@MainActor
 final class AssistantViewModel: ObservableObject {
   @Published var language: AppLanguage = .simplifiedChinese
   @Published var status: AssistantStatus = .idle
+    @Published var isContinuousMode = false
+    @Published var continuousAnalysisCount = 0
+
+    let liveCamera = LiveCameraManager()
+    private var liveAnalysisTask: Task<Void, Never>?
+    private var nextFrameTask: Task<Void, Never>?
+    private var liveRunID = 0
+    private var lastSpokenSignature: String?
+    private var lastSpokenAt = Date.distantPast
+    private let maxAnalysesPerSession = 24
 
   @Published var latestResult = VisionAnalysisResult(
     riskLevel: .unknown,
@@ -40,7 +50,7 @@ final class AssistantViewModel: ObservableObject {
   }
 
     func openCamera() {
-
+        if isContinuousMode { stopContinuousMode() }
         status = .ready
 
         // Simulator: use a test image
@@ -131,7 +141,136 @@ final class AssistantViewModel: ObservableObject {
         }
     }
 
+    func startContinuousMode() {
+        guard !isContinuousMode else { return }
 
+        liveRunID += 1
+        isContinuousMode = true
+        continuousAnalysisCount = 0
+        lastSpokenSignature = nil
+        lastSpokenAt = .distantPast
+        status = .ready
+
+        liveCamera.onFrame = { [weak self] image in
+            self?.analyzeLiveFrame(image)
+        }
+        liveCamera.onError = { [weak self] message in
+            self?.stopContinuousMode()
+            self?.alertMessage = message
+            self?.showAlert = true
+        }
+
+        liveCamera.start()
+        liveCamera.requestNextFrame()
+    }
+
+    func stopContinuousMode() {
+        guard isContinuousMode else { return }
+
+        liveRunID += 1  // Invalidate any earlier response.
+        isContinuousMode = false
+        nextFrameTask?.cancel()
+        nextFrameTask = nil
+        liveAnalysisTask?.cancel()
+        liveAnalysisTask = nil
+
+        liveCamera.stop()
+        liveCamera.onFrame = nil
+        liveCamera.onError = nil
+        speechManager.stop()
+        status = .paused
+    }
+
+    private func analyzeLiveFrame(_ image: UIImage) {
+        guard isContinuousMode, liveAnalysisTask == nil else { return }
+
+        let currentRun = liveRunID
+        capturedImage = image
+        status = .analyzing
+        continuousAnalysisCount += 1
+
+        liveAnalysisTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            do {
+                let result = try await self.analyzer.analyzeImage(image)
+                guard self.isContinuousMode,
+                      self.liveRunID == currentRun,
+                      !Task.isCancelled else { return }
+
+                let riskChanged = result.riskLevel != self.latestResult.riskLevel
+                self.latestResult = result
+                self.status = .completed
+
+                let signature = "\(result.riskLevel.rawValue)|\(result.mainObstacle.value(for: self.language))"
+                let enoughTimePassed = Date().timeIntervalSince(self.lastSpokenAt) >= 10
+                if signature != self.lastSpokenSignature && (riskChanged || enoughTimePassed) {
+                    self.lastSpokenSignature = signature
+                    self.lastSpokenAt = Date()
+                    self.handleResultFeedback(result)
+                }
+
+            } catch {
+                guard self.isContinuousMode,
+                      self.liveRunID == currentRun,
+                      !Task.isCancelled else { return }
+
+                print("[表情] Continuous analysis failed:", error)
+                self.status = .failed
+                self.latestResult = VisionAnalysisResult(
+                    riskLevel: .unknown,
+                    mainObstacle: LocalizedText(
+                        traditionalChinese: "暫時無法確認前方環境",
+                        simplifiedChinese: "暂时无法确认前方环境",
+                        english: "Unable to verify the scene"
+                    ),
+                    direction: "unknown",
+                    spokenResponse: LocalizedText(
+                        traditionalChinese: "暫時分析唔到，請停低。",
+                        simplifiedChinese: "暂时无法分析，请先停下。",
+                        english: "Analysis unavailable. Please stop."
+                    )
+                )
+
+                if self.lastSpokenSignature != "network-error" {
+                    self.lastSpokenSignature = "network-error"
+                    self.lastSpokenAt = Date()
+                    self.handleResultFeedback(self.latestResult)
+                }
+            }
+
+            guard self.isContinuousMode,
+                  self.liveRunID == currentRun,
+                  !Task.isCancelled else { return }
+
+            self.liveAnalysisTask = nil
+            if self.continuousAnalysisCount >= self.maxAnalysesPerSession {
+                self.stopContinuousMode()
+                self.alertMessage = "本轮已进行 24 次分析。为控制费用，请手动重新开始。"
+                self.showAlert = true
+            } else {
+                self.scheduleNextFrame(run: currentRun)
+            }
+        }
+    }
+
+    private func scheduleNextFrame(run: Int) {
+        nextFrameTask?.cancel()
+        nextFrameTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+            } catch {
+                return
+            }
+
+            guard let self,
+                  self.isContinuousMode,
+                  self.liveRunID == run,
+                  !Task.isCancelled else { return }
+
+            self.liveCamera.requestNextFrame()
+        }
+    }
 
 
   func simulateHighRisk() {
@@ -144,6 +283,7 @@ final class AssistantViewModel: ObservableObject {
   }
 
   func pause() {
+      if isContinuousMode { stopContinuousMode() }
     status = .paused
     hapticManager.lightTap()
     speechManager.speak(text.pausedSpeech, language: language.speechCode)
@@ -242,6 +382,8 @@ final class AssistantViewModel: ObservableObject {
       return .green
     case .paused:
       return .yellow
+    case .failed:
+        return .red
     }
   }
 

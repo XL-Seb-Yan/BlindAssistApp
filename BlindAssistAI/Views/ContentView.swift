@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
   @StateObject private var viewModel = AssistantViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     NavigationStack {
@@ -51,6 +52,14 @@ struct ContentView: View {
       } message: {
         Text(viewModel.alertMessage)
       }
+      .onChange(of: scenePhase) { _, phase in
+          if phase != .active {
+              viewModel.stopContinuousMode()
+          }
+      }
+      .onDisappear {
+          viewModel.stopContinuousMode()
+      }
     }
   }
 
@@ -86,8 +95,12 @@ struct ContentView: View {
         RoundedRectangle(cornerRadius: 20)
           .fill(Color.white.opacity(0.1))
           .frame(height: 220)
-
-        if let image = viewModel.capturedImage {
+          
+          if viewModel.isContinuousMode {
+              LiveCameraPreview(session: viewModel.liveCamera.session)
+                  .frame(height: 220)
+                  .clipShape(RoundedRectangle(cornerRadius: 20))
+          } else if let image = viewModel.capturedImage {
           Image(uiImage: image)
             .resizable()
             .scaledToFill()
@@ -188,6 +201,19 @@ struct ContentView: View {
 
   private var actionButtons: some View {
     VStack(spacing: 14) {
+        LargeActionButton(
+            title: viewModel.isContinuousMode ? "停止连续识别" : "开始连续识别",
+            systemImage: viewModel.isContinuousMode ? "stop.fill" : "video.fill",
+            backgroundColor: viewModel.isContinuousMode ? .red : .green,
+            action: {
+                if viewModel.isContinuousMode {
+                    viewModel.stopContinuousMode()
+                } else {
+                    viewModel.startContinuousMode()
+                }
+            },
+            accessibilityText: viewModel.isContinuousMode ? "停止连续识别" : "开始连续识别"
+        )
       LargeActionButton(
         title: viewModel.text.scanButtonTitle,
         systemImage: "camera.fill",

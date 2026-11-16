@@ -6,6 +6,7 @@ enum AssistantStatus {
   case analyzing
   case completed
   case paused
+    case failed
 
   func displayText(for language: AppLanguage) -> String {
     switch (self, language) {
@@ -39,6 +40,12 @@ enum AssistantStatus {
       return "已暂停"
     case (.paused, .english):
       return "Paused"
+    case (.failed, .traditionalChinese):
+        return "分析失敗"
+    case (.failed, .simplifiedChinese):
+        return "分析失败"
+    case (.failed, .english):
+        return "Analysis failed"
     }
   }
 }
