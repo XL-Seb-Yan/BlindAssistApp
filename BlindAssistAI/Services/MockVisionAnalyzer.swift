@@ -1,6 +1,8 @@
 import Foundation
+import UIKit
 
-final class MockVisionAnalyzer {
+final class MockVisionAnalyzer: VisionAnalyzing {
+    
   private var index = 0
 
   private let mockResults: [VisionAnalysisResult] = [
@@ -76,11 +78,13 @@ final class MockVisionAnalyzer {
     )
   ]
 
-  func analyzeImage() -> VisionAnalysisResult {
-    let result = mockResults[index]
-    index = (index + 1) % mockResults.count
-    return result
-  }
+    func analyzeImage(_ image: UIImage) async throws -> VisionAnalysisResult {
+        try await Task.sleep(nanoseconds: 800_000_000)
+        
+        let result = mockResults[index]
+        index = (index + 1) % mockResults.count
+        return result
+    }
 
   func highRiskScene() -> VisionAnalysisResult {
     return VisionAnalysisResult(

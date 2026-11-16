@@ -1,6 +1,6 @@
 import Foundation
 
-struct LocalizedText {
+struct LocalizedText: Codable {
   let traditionalChinese: String
   let simplifiedChinese: String
   let english: String

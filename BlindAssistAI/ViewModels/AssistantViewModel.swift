@@ -29,46 +29,115 @@ final class AssistantViewModel: ObservableObject {
 
   private let speechManager = SpeechManager()
   private let hapticManager = HapticManager()
-  private let analyzer = MockVisionAnalyzer()
+  private let analyzer:VisionAnalyzing
+  init(analyzer:VisionAnalyzing = OpenAIVisionAnalyzer()){
+    self.analyzer = analyzer
+  }
 
   func toggleLanguage() {
     language = language.next
     speechManager.speak(text.languageChanged, language: language.speechCode)
   }
 
-  func openCamera() {
-    status = .ready
+    func openCamera() {
 
-    guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
-      alertMessage = text.cameraUnavailableAlert
-      showAlert = true
-      speechManager.speak(text.cameraUnavailableSpeech, language: language.speechCode)
-      return
+        status = .ready
+
+        // Simulator: use a test image
+        #if targetEnvironment(simulator)
+
+        print("Running in Simulator")
+
+        guard let image = UIImage(named: "TestScene") else {
+            print("TestScene image not found")
+            return
+        }
+
+        print("Test image loaded")
+
+        handleCapturedImage(image)
+        return
+
+        #else
+
+        // Real iPhone: use camera
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            alertMessage = text.cameraUnavailableAlert
+            showAlert = true
+
+            speechManager.speak(
+                text.cameraUnavailableSpeech,
+                language: language.speechCode
+            )
+            return
+        }
+
+        speechManager.speak(
+            text.cameraPrompt,
+            language: language.speechCode
+        )
+
+        showCamera = true
+
+        #endif
     }
 
-    speechManager.speak(text.cameraPrompt, language: language.speechCode)
-    showCamera = true
-  }
 
   func handleCapturedImage(_ image: UIImage) {
     capturedImage = image
     analyzeCapturedImage()
   }
 
-  func analyzeCapturedImage() {
-    status = .analyzing
-    speechManager.speak(text.analyzingSpeech, language: language.speechCode)
+    func analyzeCapturedImage() {
+        guard let image = capturedImage else {
+            return
+        }
 
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-      let result = self.analyzer.analyzeImage()
-      self.latestResult = result
-      self.status = .completed
-      self.handleResultFeedback(result)
+        status = .analyzing
+
+        speechManager.speak(
+            text.analyzingSpeech,
+            language: language.speechCode
+        )
+
+        Task { @MainActor in
+            do {
+                let result = try await analyzer.analyzeImage(image)
+
+                latestResult = result
+                status = .completed
+
+                handleResultFeedback(result)
+
+            } catch {
+                latestResult = VisionAnalysisResult(
+                    riskLevel: .unknown,
+                    mainObstacle: LocalizedText(
+                        traditionalChinese: "暫時無法完成分析",
+                        simplifiedChinese: "暂时无法完成分析",
+                        english: "Analysis could not be completed"
+                    ),
+                    direction: "unknown",
+                    spokenResponse: LocalizedText(
+                        traditionalChinese: "暫時分析唔到，停低先，再試多次。",
+                        simplifiedChinese: "暂时无法完成分析，请停下并重新尝试。",
+                        english: "Analysis failed. Please stop and try again."
+                    )
+                )
+
+                status = .completed
+                handleResultFeedback(latestResult)
+            }
+        }
     }
-  }
+
+
+
 
   func simulateHighRisk() {
-    let result = analyzer.highRiskScene()
+    let mockAnalyzer = MockVisionAnalyzer()
+    let result = mockAnalyzer.highRiskScene()
+    
     latestResult = result
     status = .completed
     handleResultFeedback(result)
@@ -207,7 +276,7 @@ struct AppText {
   var languageChanged: String {
     switch language {
     case .traditionalChinese:
-      return "已切換為繁體中文。"
+      return "已經轉為廣東話啦。"
     case .simplifiedChinese:
       return "已切换为简体中文。"
     case .english:
@@ -348,23 +417,23 @@ struct AppText {
 
   var cameraPrompt: String {
     localized(
-      traditional: "請將手機對準前方，然後拍照。",
+      traditional: "麻煩將部電話對住前面，然後影相。",
       simplified: "请将手机对准前方，然后拍照。",
       english: "Point the phone forward, then take a photo."
     )
   }
 
   var analyzingSpeech: String {
-    localized(traditional: "正在分析前方環境。", simplified: "正在分析前方环境。", english: "Analyzing the area ahead.")
+    localized(traditional: "而家分析緊前面嘅環境。", simplified: "正在分析前方环境。", english: "Analyzing the area ahead.")
   }
 
   var pausedSpeech: String {
-    localized(traditional: "已暫停識別。", simplified: "已暂停识别。", english: "Recognition paused.")
+    localized(traditional: "而家停止識別前面個環境。", simplified: "已暂停识别。", english: "Recognition paused.")
   }
 
   var emergencyHelpSpeech: String {
     localized(
-      traditional: "緊急求助功能將在後續版本加入。請先聯絡身邊的人。",
+      traditional: "緊急求助功能會喺之後嘅版本先加入，麻煩先聯絡返身邊嘅人。",
       simplified: "紧急求助功能将在后续版本加入。请先联系身边的人。",
       english: "Emergency help will be added in a later version. Please contact someone nearby first."
     )
